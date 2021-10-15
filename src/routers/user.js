@@ -1,25 +1,59 @@
 const express = require("express");
+
 const router = new express.Router();
 
+const auth = require("../middleware/auth");
 const User = require("../models/user");
 
 router.post("/users", async (req, res) => {
   try {
     const user = new User(req.body);
     const newUser = await user.save();
-    res.status(201).send(newUser);
+    const token = await user.generateAuthToken();
+
+    res.status(201).send({ user: newUser, token });
   } catch (e) {
     res.status(400).send(e);
   }
 });
 
-router.get("/users", async (req, res) => {
+router.post("/users/login", async (req, res) => {
   try {
-    const users = await User.find({});
-    res.send(users);
+    const user = await User.findByCredentials(
+      req.body.email,
+      req.body.password
+    );
+    const token = await user.generateAuthToken();
+    res.send({ user, token });
+  } catch (e) {
+    res.status(400).send();
+  }
+});
+
+router.post("/users/logout", auth, async (req, res) => {
+  try {
+    req.user.token = req.user.tokens.filter((token) => {
+      return token.token !== req.token;
+    });
+    await req.user.save();
+    res.send();
   } catch (e) {
     res.status(500).send();
   }
+});
+
+router.post("/users/logoutall", auth, async (req, res) => {
+  try {
+    req.user.token = [];
+    await req.user.save();
+    res.send();
+  } catch (e) {
+    res.status(500).send();
+  }
+});
+
+router.get("/users/me", auth, async (req, res) => {
+  res.send(req.user);
 });
 
 router.get("/users/:id", async (req, res) => {
@@ -45,10 +79,13 @@ router.patch("/users/:id", async (req, res) => {
 
   try {
     const _id = req.params.id;
-    const user = await User.findByIdAndUpdate(_id, req.body, {
+    const user = await User.findById(_id);
+    updates.forEach((update) => (user[update] = req.body[update]));
+    await user.save();
+    /* const user = await User.findByIdAndUpdate(_id, req.body, {
       new: true,
       runValidators: true,
-    });
+    }); */
 
     if (!user) return res.status(404).send;
 
