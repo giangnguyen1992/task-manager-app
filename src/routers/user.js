@@ -12,10 +12,10 @@ router.post(
   async (req, res) => {
     try {
       const user = new User(req.body);
-      const newUser = await user.save();
+      await user.save();
       const token = await user.generateAuthToken();
 
-      res.status(201).send({ user: newUser, token });
+      res.status(201).send({ user, token });
     } catch (e) {
       res.status(400).send(e);
     }
